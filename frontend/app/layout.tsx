@@ -1,4 +1,12 @@
 import type { Metadata } from "next";
+import { Manrope } from "next/font/google";
+import "./globals.css";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata: Metadata = {
   title: "Freight Marketplace",
@@ -12,12 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <nav style={{ padding: "0.5rem 1rem", borderBottom: "1px solid #eee", marginBottom: 0 }}>
-          <a href="/marketplace" style={{ marginRight: "1rem" }}>Freight Marketplace</a>
-        </nav>
-        {children}
-      </body>
+      <body className={manrope.variable}>{children}</body>
     </html>
   );
 }

@@ -123,11 +123,23 @@ export function getOrders(params: {
   q?: string;
   page?: number;
   page_size?: number;
+  available_date?: string;
+  time_window?: string;
+  pickup?: string;
+  delivery?: string;
+  equipment?: string;
+  shipper?: string;
 }): Promise<OrderListResponse> {
   const sp = new URLSearchParams();
   if (params.q) sp.set("q", params.q);
   if (params.page != null) sp.set("page", String(params.page));
   if (params.page_size != null) sp.set("page_size", String(params.page_size));
+  if (params.available_date) sp.set("available_date", params.available_date);
+  if (params.time_window) sp.set("time_window", params.time_window);
+  if (params.pickup) sp.set("pickup", params.pickup);
+  if (params.delivery) sp.set("delivery", params.delivery);
+  if (params.equipment) sp.set("equipment", params.equipment);
+  if (params.shipper) sp.set("shipper", params.shipper);
   const query = sp.toString();
   return fetchApi<OrderListResponse>(`/orders${query ? `?${query}` : ""}`);
 }
@@ -153,9 +165,8 @@ export function updateOrderStops(
   });
 }
 
-export function searchCustomers(query: string): Promise<{ items: CustomerListItem[] }> {
-  if (!query.trim()) return Promise.resolve({ items: [] });
-  return fetchApi<{ items: CustomerListItem[] }>(
-    `/customers?query=${encodeURIComponent(query.trim())}`
-  );
+export function searchCustomers(query = ""): Promise<{ items: CustomerListItem[] }> {
+  const trimmed = query.trim();
+  const params = trimmed ? `?query=${encodeURIComponent(trimmed)}` : "";
+  return fetchApi<{ items: CustomerListItem[] }>(`/customers${params}`);
 }

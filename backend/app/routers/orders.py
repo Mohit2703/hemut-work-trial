@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
+from datetime import date, datetime, timedelta
 
 from app.database import get_db
 from app.models import Order, Stop, Customer
@@ -53,6 +54,39 @@ def _get_origin_destination(order: Order) -> tuple[str | None, str | None, str |
         last.city,
         last.state,
     )
+
+
+def _normalize(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _normalize_equipment(value: str | None) -> str:
+    return _normalize(value).replace(" ", "-")
+
+
+def _matches_location_filter(term: str, city: str | None, state: str | None) -> bool:
+    normalized = _normalize(term)
+    if not normalized:
+        return True
+    haystack = " ".join(part for part in [city, state] if part).lower()
+    return normalized in haystack
+
+
+def _matches_time_window_filter(scheduled_at: datetime | None, time_window: str) -> bool:
+    normalized = _normalize(time_window)
+    if not normalized:
+        return True
+    if not scheduled_at:
+        return False
+
+    hour = scheduled_at.hour
+    if normalized == "morning":
+        return 5 <= hour < 12
+    if normalized == "afternoon":
+        return 12 <= hour < 17
+    if normalized == "evening":
+        return 17 <= hour < 23
+    return True
 
 
 @router.post("", response_model=OrderResponse, status_code=201)
@@ -114,12 +148,22 @@ def create_order(body: OrderCreate, db: Session = Depends(get_db)):
 @router.get("", response_model=OrderListResponse)
 def list_orders(
     q: str = Query("", description="Search by order id, customer name, origin/destination city or state"),
+    available_date: date | None = Query(None, description="Filter by origin scheduled arrival date"),
+    time_window: str = Query("", description="morning|afternoon|evening"),
+    pickup: str = Query("", description="Origin city/state"),
+    delivery: str = Query("", description="Destination city/state"),
+    equipment: str = Query("", description="flatbed|reefer|dry-van"),
+    shipper: str = Query("", description="all|preferred|new"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     """List orders with search and pagination."""
-    query = db.query(Order).join(Customer, Order.customer_id == Customer.id)
+    query = (
+        db.query(Order)
+        .options(joinedload(Order.customer), joinedload(Order.stops))
+        .join(Customer, Order.customer_id == Customer.id)
+    )
     if q and q.strip():
         term = f"%{q.strip()}%"
         search_filter = or_(
@@ -131,12 +175,48 @@ def list_orders(
             search_filter = or_(search_filter, Order.id == int(q.strip()))
         query = query.outerjoin(Stop, Order.id == Stop.order_id).filter(search_filter).distinct()
 
-    total = query.count()
+    orders = query.order_by(Order.id.desc()).all()
+
+    filtered_orders: list[Order] = []
+    for order in orders:
+        origin_city, origin_state, destination_city, destination_state = _get_origin_destination(order)
+        origin_stop = sorted(order.stops, key=lambda s: s.sequence)[0] if order.stops else None
+        origin_eta = origin_stop.scheduled_arrival_early if origin_stop else None
+
+        if available_date and (not origin_eta or origin_eta.date() != available_date):
+            continue
+        if not _matches_time_window_filter(origin_eta, time_window):
+            continue
+        if not _matches_location_filter(pickup, origin_city, origin_state):
+            continue
+        if not _matches_location_filter(delivery, destination_city, destination_state):
+            continue
+        if _normalize_equipment(equipment) not in ("", "all"):
+            if _normalize_equipment(order.trailer_type) != _normalize_equipment(equipment):
+                continue
+        normalized_shipper = _normalize(shipper)
+        if normalized_shipper == "preferred":
+            if not order.customer or not order.customer.mc_number:
+                continue
+        if normalized_shipper == "new":
+            if not order.created_at:
+                continue
+            cutoff = (
+                datetime.now(order.created_at.tzinfo) - timedelta(days=30)
+                if order.created_at.tzinfo
+                else datetime.utcnow() - timedelta(days=30)
+            )
+            if order.created_at < cutoff:
+                continue
+
+        filtered_orders.append(order)
+
+    total = len(filtered_orders)
     offset = (page - 1) * page_size
-    orders = query.order_by(Order.id.desc()).offset(offset).limit(page_size).all()
+    page_orders = filtered_orders[offset : offset + page_size]
 
     items = []
-    for order in orders:
+    for order in page_orders:
         oc, os, dc, ds = _get_origin_destination(order)
         items.append(
             OrderListItem(

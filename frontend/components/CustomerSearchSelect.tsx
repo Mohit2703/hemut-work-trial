@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { searchCustomers, type CustomerListItem } from "@/lib/api";
 
 interface CustomerSearchSelectProps {
@@ -12,106 +12,77 @@ interface CustomerSearchSelectProps {
 export default function CustomerSearchSelect({
   value,
   onChange,
-  placeholder = "Search customer...",
+  placeholder = "Select customer",
 }: CustomerSearchSelectProps) {
-  const [query, setQuery] = useState(value?.name ?? "");
+  const [selectedId, setSelectedId] = useState<string>(value ? String(value.id) : "");
   const [items, setItems] = useState<CustomerListItem[]>([]);
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (value) setQuery(value.name);
+    setSelectedId(value ? String(value.id) : "");
   }, [value]);
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
-      setItems([]);
-      setOpen(false);
-      return;
-    }
-    debounceRef.current = setTimeout(() => {
-      setLoading(true);
-      searchCustomers(query)
-        .then((r) => {
-          setItems(r.items);
-          setOpen(true);
-        })
-        .catch(() => setItems([]))
-        .finally(() => setLoading(false));
-    }, 250);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    setLoading(true);
+    searchCustomers("")
+      .then((response) => {
+        setItems(response.items);
+        setLoadError(null);
+      })
+      .catch(() => {
+        setItems([]);
+        setLoadError("Failed to load customers");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
+  const selectedFromItems = useMemo(
+    () => items.find((customer) => customer.id === Number(selectedId)) ?? null,
+    [items, selectedId]
+  );
+
+  const selectedCustomer = selectedFromItems ?? value ?? null;
+
   return (
-    <div ref={wrapperRef} style={{ position: "relative" }}>
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          if (!e.target.value) onChange(null);
+    <div className="customer-search">
+      <select
+        className="customer-search-input"
+        value={selectedId}
+        onChange={(event) => {
+          const nextId = event.target.value;
+          setSelectedId(nextId);
+          if (!nextId) {
+            onChange(null);
+            return;
+          }
+
+          const selected = items.find((customer) => customer.id === Number(nextId));
+          onChange(selected ?? null);
         }}
-        onFocus={() => items.length > 0 && setOpen(true)}
-        style={{ width: "100%", padding: "0.5rem" }}
-      />
-      {loading && (
-        <span style={{ position: "absolute", right: 8, top: 8, fontSize: "0.8rem", color: "#666" }}>
-          ...
-        </span>
-      )}
-      {open && items.length > 0 && (
-        <ul
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            margin: 0,
-            padding: 0,
-            listStyle: "none",
-            background: "#fff",
-            border: "1px solid #ccc",
-            maxHeight: 200,
-            overflowY: "auto",
-            zIndex: 10,
-          }}
-        >
-          {items.map((c) => (
-            <li
-              key={c.id}
-              style={{ padding: "0.5rem 0.75rem", cursor: "pointer", borderBottom: "1px solid #eee" }}
-              onClick={() => {
-                onChange(c);
-                setQuery(c.name);
-                setOpen(false);
-              }}
-            >
-              {c.name}
-              {(c.city || c.state) && (
-                <span style={{ color: "#666", marginLeft: "0.5rem" }}>
-                  {[c.city, c.state].filter(Boolean).join(", ")}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      >
+        <option value="">{loading ? "Loading customers..." : placeholder}</option>
+
+        {selectedCustomer && !items.some((customer) => customer.id === selectedCustomer.id) ? (
+          <option value={String(selectedCustomer.id)}>
+            {selectedCustomer.name}
+            {[selectedCustomer.city, selectedCustomer.state].filter(Boolean).length
+              ? ` (${[selectedCustomer.city, selectedCustomer.state].filter(Boolean).join(", ")})`
+              : ""}
+          </option>
+        ) : null}
+
+        {items.map((customer) => (
+          <option key={customer.id} value={String(customer.id)}>
+            {customer.name}
+            {[customer.city, customer.state].filter(Boolean).length
+              ? ` (${[customer.city, customer.state].filter(Boolean).join(", ")})`
+              : ""}
+          </option>
+        ))}
+      </select>
+
+      {loadError ? <p className="customer-search-error">{loadError}</p> : null}
     </div>
   );
 }
