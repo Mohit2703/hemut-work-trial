@@ -48,6 +48,8 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
 
   const [calcRate, setCalcRate] = useState(2.5);
   const [calcMiles, setCalcMiles] = useState(0);
+  const [calcStopCount, setCalcStopCount] = useState(0);
+  const [calcStopRate, setCalcStopRate] = useState(75);
   const [accessories, setAccessories] = useState<AccessoryItem[]>([
     { id: "a1", name: "Lumper Fee", amount: 150 },
     { id: "a2", name: "Detention Charge", amount: 75 },
@@ -66,6 +68,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
       .then((response) => {
         setOrder(response);
         setCalcMiles(Math.round(response.total_miles ?? 0));
+        setCalcStopCount(response.stops?.length ?? 0);
       })
       .catch(() => setOrder(null))
       .finally(() => setLoading(false));
@@ -86,12 +89,14 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
   }, [sortedStops]);
 
   const baseCost = calcRate * calcMiles;
+  const stopCost = calcStopCount * calcStopRate;
   const accessoryTotal = accessories.reduce((sum, item) => sum + item.amount, 0);
+  const subtotal = baseCost + stopCost + accessoryTotal;
   const marginAmount =
     marginMode === "percentage"
-      ? ((baseCost + accessoryTotal) * marginValue) / 100
+      ? (subtotal * marginValue) / 100
       : marginValue;
-  const quoteTotal = baseCost + accessoryTotal + marginAmount;
+  const quoteTotal = subtotal + marginAmount;
 
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "load", label: "Load Details" },
@@ -360,6 +365,42 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
             </section>
 
             <section className="drawer-card">
+              <h3 className="drawer-section-title">Stop Pricing</h3>
+              <div className="calc-row">
+                <div>
+                  <label className="field-label">Number of Stops</label>
+                  <input
+                    className="calc-input"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={Number.isFinite(calcStopCount) ? calcStopCount : 0}
+                    onChange={(event) =>
+                      setCalcStopCount(Math.max(0, Math.floor(Number(event.target.value) || 0)))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="field-label">Charge per Stop ($)</label>
+                  <input
+                    className="calc-input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={Number.isFinite(calcStopRate) ? calcStopRate : 0}
+                    onChange={(event) => setCalcStopRate(Math.max(0, Number(event.target.value) || 0))}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
+                <span className="item-label">Stops Cost</span>
+                <strong style={{ fontSize: "calc(24px * var(--font-scale))", lineHeight: 1 }}>
+                  ${stopCost.toFixed(2)}
+                </strong>
+              </div>
+            </section>
+
+            <section className="drawer-card">
               <h3 className="drawer-section-title">Accessories</h3>
               {accessories.map((item) => (
                 <div key={item.id} className="accessory-row">
@@ -447,6 +488,10 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                 <div className="item">
                   <div className="item-label">Base</div>
                   <div className="item-value">${baseCost.toFixed(2)}</div>
+                </div>
+                <div className="item">
+                  <div className="item-label">Stops</div>
+                  <div className="item-value">${stopCost.toFixed(2)}</div>
                 </div>
                 <div className="item">
                   <div className="item-label">Accessories</div>

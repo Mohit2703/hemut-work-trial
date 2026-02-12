@@ -2,6 +2,10 @@
 
 A freight marketplace application with FastAPI backend and Next.js frontend.
 
+## Implementation Notes
+
+- Detailed implementation documentation: `IMPLEMENTATION.md`
+
 ## Prerequisites
 
 - Docker and Docker Compose
