@@ -1,248 +1,130 @@
 # Freight Marketplace MVP - Step-by-Step Implementation Plan
 
-This plan is designed to execute **one step at a time** with explicit testing before moving to the next step.
+**Reference:** [screenshots/](screenshots/) (Hemut-inspired UI: list, right-side panel with Load Details / Customer Details / Lane History / Calculator, Create Order, order details with stops).
 
-## Execution Rules
-1. Implement only the current step.
-2. Run that step's tests/checks.
-3. If checks fail, fix before proceeding.
-4. Commit after each passing step.
-5. Move to the next step only when current step is green.
+**How to use:** Execute **one step at a time**. At the end of each step, run the **Testing** checklist. Commit after each step. Do not skip steps.
 
-## Step 1 - Project scaffold + Docker baseline
-**Build:**
-- Create monorepo structure (`backend/`, `frontend/`, root docs/files).
-- Add `docker-compose.yml` with services: `db` (Postgres), `backend` (FastAPI), `frontend` (Next.js).
-- Add `.env.example`.
-
-**Checks:**
-- `docker compose config` passes.
-- `docker compose up --build -d` starts all services.
-- Backend health endpoint returns 200.
-- Frontend root page loads.
-
-**Commit:** `chore: scaffold project and docker compose baseline`
+**Execution order:** Step 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8.
 
 ---
 
-## Step 2 - Backend app skeleton + DB wiring
-**Build:**
-- FastAPI app entrypoint, DB session setup, config loading.
-- SQLAlchemy + Alembic initialization.
-- Base app router structure.
+## Step 1 – Scaffold (repo, Docker, back/front skeletons)
 
-**Checks:**
-- Backend container starts cleanly.
-- `alembic current` runs without error.
+**Scope:**
+- Root: `docker-compose.yml` (services: postgres, backend, frontend), `.env.example` (DATABASE_URL, NEXT_PUBLIC_API_URL).
+- `backend/`: Dockerfile (Python 3.11+), `requirements.txt` (fastapi, uvicorn, sqlalchemy, psycopg2-binary, pydantic, alembic), `app/main.py` (FastAPI app, CORS, GET /health), `app/config.py` (DB URL from env).
+- `frontend/`: Next.js (App Router, TypeScript), Dockerfile, `app/layout.tsx`, `app/page.tsx` (redirect to /marketplace).
+- README: docker compose up, migrations, seed, main URLs.
 
-**Commit:** `chore: initialize fastapi app, sqlalchemy, and alembic`
+**Testing:**
+- From repo root: `docker compose up --build`. Backend: `curl http://localhost:8000/health` returns 200. Frontend: open http://localhost:3000, redirects to /marketplace. Postgres up; backend starts without DB errors (no tables yet OK).
 
----
-
-## Step 3 - ORM models + initial migration
-**Build:**
-- SQLAlchemy models: `Customer`, `Order`, `Stop` (+ optional `LaneHistory`).
-- Fields, relationships, constraints.
-- Route geometry JSONB on `orders`.
-- Search indexes:
-  - `customers.name`
-  - `orders.customer_id`
-  - `stops(order_id, sequence)`
-
-**Checks:**
-- `alembic revision --autogenerate` (or explicit migration file).
-- `alembic upgrade head` succeeds.
-- Verify tables/indexes exist in Postgres.
-
-**Commit:** `feat: add core orm models and initial migration`
+**Commit:** `Scaffold: docker-compose, backend FastAPI, frontend Next.js`
 
 ---
 
-## Step 4 - Seed data
-**Build:**
-- Seed script for customers + orders + nested stops.
-- Include 2-4 stops per order.
-- Compute route geometry as LineString from stop sequence.
+## Step 2 – Database models, Alembic, session
 
-**Checks:**
-- Run seed command successfully.
-- DB sanity queries show expected row counts.
-- Spot-check one seeded order includes stops + geometry.
+**Scope:**
+- `backend/app/database.py`: engine, SessionLocal, Base, get_db().
+- `backend/app/models/`: customer.py, order.py, stop.py (optional lane_history.py). Fields/indexes: see plan/API_AND_MODELS.md. orders.route_geometry JSONB.
+- models/__init__.py exports all. Alembic init; env.py uses app config/database; one initial migration (customers, orders, stops + indexes).
+- main.py: app starts and can connect to DB.
 
-**Commit:** `feat: add seed data for customers orders and stops`
+**Testing:**
+- `docker compose up`. `alembic upgrade head`. Tables customers, orders, stops exist; indexes present. Backend starts.
 
----
-
-## Step 5 - Validation schemas + shared service helpers
-**Build:**
-- Pydantic request/response schemas.
-- Validation rules (stops min count, pickup/dropoff presence, lat/lng bounds, etc.).
-- Service helper for geometry recomputation and origin/destination derivation.
-
-**Checks:**
-- Backend startup validates schema imports.
-- Unit-level sanity for geometry helper.
-
-**Commit:** `feat: add api schemas and order geometry helpers`
+**Commit:** `Add SQLAlchemy models and Alembic initial migration`
 
 ---
 
-## Step 6 - `POST /orders` (transactional nested create)
-**Build:**
-- Create order with nested stops in one transaction.
-- Return created order with ordered stops + geometry.
+## Step 3 – Seed data
 
-**Checks:**
-- Backend test: create order success.
-- Backend test: invalid payload returns 422.
-- Verify data persisted correctly in DB.
+**Scope:**
+- `backend/scripts/seed.py`: 5–8 customers, 3–5 orders with 2–4 stops each; compute route_geometry (LineString from stops by sequence). Idempotent.
+- README: add "Run seed" (e.g. `docker compose exec backend python scripts/seed.py`).
 
-**Commit:** `feat: implement create order endpoint with nested stops`
+**Testing:**
+- Run migrations then seed. `SELECT COUNT(*) FROM customers` (5–8). One order has route_geometry JSON with type and coordinates.
 
----
-
-## Step 7 - `GET /orders` (search + pagination)
-**Build:**
-- List endpoint with `query`, `page`, `page_size`.
-- Search by order id, customer name, origin, destination.
-
-**Checks:**
-- Backend test: list pagination metadata correct.
-- Backend test: search query matches expected results.
-
-**Commit:** `feat: implement list orders with search and pagination`
+**Commit:** `Add seed script and seed data`
 
 ---
 
-## Step 8 - `GET /orders/{id}` details
-**Build:**
-- Order detail with customer, ordered stops, route geometry.
-- Include lane history stats payload (computed or mocked from backend data).
+## Step 4 – Orders and customers API
 
-**Checks:**
-- Detail endpoint returns full object shape.
-- 404 behavior for unknown id.
+**Scope:**
+- `backend/app/schemas/`: Pydantic for order create/response, stop create/update, list response, customer response. Match API_AND_MODELS.md.
+- `backend/app/services/geometry.py`: stops → GeoJSON LineString dict.
+- `backend/app/routers/orders.py`: POST /orders, GET /orders (q, page, page_size), GET /orders/{id}, PUT /orders/{id}/stops. Validation: ≥1 stop, valid customer_id, unique sequences; 400/404.
+- `backend/app/routers/customers.py`: GET /customers?query= (ILIKE name).
+- main.py: include routers.
 
-**Commit:** `feat: implement order details endpoint with stops and lane history`
+**Testing:**
+- POST /orders (body from API_AND_MODELS.md) → 201, response has id, stops, route_geometry. GET /orders → 200; GET /orders?q=... and ?page=2&page_size=2 work. GET /orders/1 → 200; GET /orders/99999 → 404. PUT /orders/1/stops → 200. GET /customers?query=xyz → 200.
 
----
-
-## Step 9 - `PUT /orders/{id}/stops` (Enhancement A)
-**Build:**
-- Replace/reorder/add/remove stops.
-- Recompute sequence, geometry, and origin/destination.
-
-**Checks:**
-- Backend test: reorder persists sequence correctly.
-- Backend test: geometry updates after reorder.
-- Endpoint validation for invalid stop sets.
-
-**Commit:** `feat: implement stop replace reorder endpoint with geometry recompute`
+**Commit:** `Implement orders and customers API`
 
 ---
 
-## Step 10 - `GET /customers?query=`
-**Build:**
-- Customer fuzzy search with ILIKE.
-- Return limited results for select input.
+## Step 5 – Frontend: marketplace list + drawer
 
-**Checks:**
-- Endpoint returns matched customers sorted by relevance/basic ordering.
-- Empty query behavior is stable and documented.
+**Scope:**
+- `frontend/lib/api.ts`: getOrders, getOrder, createOrder, updateOrderStops, searchCustomers.
+- `frontend/app/marketplace/page.tsx`: list, search, page, selectedOrderId; fetch GET /orders; table/list; row click sets selected id.
+- Drawer: fetch GET /orders/{id}; tabs: Load Details (stops + "View on Map" → /orders/[id]), Customer Details, Lane History (mock stats), Calculator (base $/mi, miles, accessorials, margin → total). "Create Order" button.
 
-**Commit:** `feat: implement customer search endpoint`
+**Testing:**
+- /marketplace shows list; search/pagination work; row click opens drawer; all four tabs; View on Map links to /orders/1.
 
----
-
-## Step 11 - Frontend foundation + API client
-**Build:**
-- Next.js app skeleton.
-- Shared API client and typed interfaces.
-- Route shell: `/marketplace`, `/orders/[id]`.
-
-**Checks:**
-- Frontend compiles in Docker.
-- API client can fetch backend from container network.
-
-**Commit:** `chore: scaffold nextjs app routes and api client`
+**Commit:** `Frontend: marketplace list and details drawer with tabs`
 
 ---
 
-## Step 12 - Marketplace page (list + search + pagination + drawer)
-**Build:**
-- Inbound orders table.
-- Search input + pagination controls.
-- Row click opens right-side drawer with tabs:
-  - Load Details
-  - Customer Details
-  - Lane History
-  - Calculator
+## Step 6 – Create Order modal + Order details page
 
-**Checks:**
-- Manual UI check for all listed interactions.
-- Verify API calls and pagination state transitions.
+**Scope:**
+- Create Order modal: customer search (GET /customers), trailer_type, load_type, weight, notes; stops add/remove/reorder; per-stop type, location, address, city, state, zip, lat, lng, scheduled early/late. Submit POST /orders; on success close and refresh list.
+- `frontend/app/orders/[id]/page.tsx`: fetch GET /orders/[id]; ordered stops list; Leaflet map (markers + polyline from route_geometry.coordinates [lng,lat]).
 
-**Commit:** `feat: implement marketplace list and details drawer with tabs`
+**Testing:**
+- Create order flow works; new order in list and drawer; /orders/[newId] shows stops and map with polyline.
+
+**Commit:** `Create Order modal and order details page with map`
 
 ---
 
-## Step 13 - Create Order modal/form
-**Build:**
-- Minimal create form with:
-  - customer search select
-  - trailer type, load type/commodity, weight, notes
-  - stops add/remove with required fields
-- Submit via `POST /orders`.
+## Step 7 – Tests and docs
 
-**Checks:**
-- Manual create flow works end-to-end.
-- Validation errors visible in UI.
-- New order appears in marketplace list.
+**Scope:**
+- ≥2 backend tests (pytest): e.g. POST /orders → 201 with route_geometry; GET /orders search or PUT /orders/{id}/stops reorder.
+- ARCHITECTURE.md: tradeoffs, GeoJSON in JSONB, future improvements.
+- README: docker compose up, migrations, seed, URLs, demo script.
 
-**Commit:** `feat: add create order modal with nested stops submission`
+**Testing:**
+- `docker compose exec backend pytest` – both tests pass. ARCHITECTURE.md and README complete.
+
+**Commit:** `Add backend tests and ARCHITECTURE.md`
 
 ---
 
-## Step 14 - Order details page + map + reorder UI
-**Build:**
-- `/orders/[id]` page with ordered stop list.
-- Leaflet map markers + polyline from geometry.
-- Up/down controls to reorder stops and persist via `PUT /orders/{id}/stops`.
+## Step 8 – One enhancement (pick A, B, or C)
 
-**Checks:**
-- Reorder updates UI and persists after refresh.
-- Polyline updates after reorder.
+**A) Reorder stops:** Up/down on /orders/[id]; PUT /orders/{id}/stops; geometry recompute; map updates.  
+**B) Customer search ranking:** ILIKE + score; return sorted.  
+**C) Lane history:** lane_history table + seed; endpoint for lane stats; Lane History tab uses it.
 
-**Commit:** `feat: implement order details page with map and stop reordering`
+**Testing:** A: reorder and map update. B: result order. C: Lane tab shows backend stats.
+
+**Commit:** `Enhancement: [A|B|C]`
 
 ---
 
-## Step 15 - Tests, docs, final smoke run
-**Build:**
-- Ensure at least 2 backend tests (create + list/search or reorder).
-- Write `README.md` (compose up, migrations, seed, URLs, demo script).
-- Write `ARCHITECTURE.md` (tradeoffs, geo storage, future improvements).
+## Suggested commands
 
-**Checks:**
-- `docker compose up --build` clean startup.
-- Backend tests pass.
-- Manual smoke: create order -> view in list -> open details -> reorder stops.
-
-**Commit:** `docs: add architecture and runbook; test: finalize backend coverage`
-
----
-
-## Suggested Test Commands (standardized)
 - `docker compose up --build -d`
 - `docker compose exec backend alembic upgrade head`
-- `docker compose exec backend python -m app.seed`
+- `docker compose exec backend python scripts/seed.py`
 - `docker compose exec backend pytest -q`
-- `docker compose logs backend --tail=100`
-- `docker compose logs frontend --tail=100`
-
-## Definition of Done
-- All required endpoints implemented and validated.
-- Database migrations + seed working.
-- Marketplace page + order details page + create order flow functional.
-- Enhancement A fully shipped (reorder + persist + polyline recompute).
-- Basic tests passing and docs complete.
+- `curl http://localhost:8000/health`
+- `curl "http://localhost:8000/orders?page=1&page_size=5"`
