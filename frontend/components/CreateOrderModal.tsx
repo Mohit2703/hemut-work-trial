@@ -33,8 +33,6 @@ interface StopRow {
   city: string;
   state: string;
   zip: string;
-  lat: number | "";
-  lng: number | "";
   scheduled_arrival_early: string;
   scheduled_arrival_late: string;
   driver_load: string;
@@ -154,8 +152,6 @@ function emptyStop(stopType: "pickup" | "stop" | "dropoff"): StopRow {
     city: "",
     state: "OH",
     zip: "",
-    lat: "",
-    lng: "",
     scheduled_arrival_early: "",
     scheduled_arrival_late: "",
     driver_load: "Live Load",
@@ -271,8 +267,6 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
       city: stop.city || undefined,
       state: stop.state || undefined,
       zip: stop.zip || undefined,
-      lat: typeof stop.lat === "number" ? stop.lat : undefined,
-      lng: typeof stop.lng === "number" ? stop.lng : undefined,
       scheduled_arrival_early: stop.scheduled_arrival_early || undefined,
       scheduled_arrival_late: stop.scheduled_arrival_late || undefined,
       sequence: index + 1,
@@ -453,7 +447,7 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
                   <p className="create-section-sub" style={{ margin: 0 }}>
-                    Add each stop in order.
+                    Add each stop in order. Lat/lng are auto-calculated from location.
                   </p>
                   <button type="button" className="secondary-btn" onClick={addStop}>
                     + Add Stop
@@ -598,7 +592,7 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
                       </div>
                     </div>
 
-                    <div className="form-grid three" style={{ marginTop: 8 }}>
+                    <div className="form-grid" style={{ marginTop: 8 }}>
                       <div>
                         <label className="field-label">Driver Load</label>
                         <select
@@ -609,40 +603,6 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
                           <option value="Live Load">Live Load</option>
                           <option value="Drop & Hook">Drop & Hook</option>
                         </select>
-                      </div>
-                      <div>
-                        <label className="field-label">Lat</label>
-                        <input
-                          className="field-control"
-                          type="number"
-                          step="any"
-                          value={stop.lat}
-                          onChange={(event) =>
-                            updateStop(
-                              index,
-                              "lat",
-                              event.target.value === "" ? "" : Number(event.target.value)
-                            )
-                          }
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="field-label">Lng</label>
-                        <input
-                          className="field-control"
-                          type="number"
-                          step="any"
-                          value={stop.lng}
-                          onChange={(event) =>
-                            updateStop(
-                              index,
-                              "lng",
-                              event.target.value === "" ? "" : Number(event.target.value)
-                            )
-                          }
-                          placeholder="0"
-                        />
                       </div>
                     </div>
 

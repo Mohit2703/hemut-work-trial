@@ -14,7 +14,7 @@ from app.schemas import (
     StopResponse,
     CustomerCard,
 )
-from app.services.geometry import stops_to_linestring, compute_total_miles
+from app.services.geometry import stops_to_linestring, compute_total_miles, enrich_stops_with_coordinates
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -136,6 +136,8 @@ def create_order(body: OrderCreate, db: Session = Depends(get_db)):
 
     # Re-fetch stops and compute geometry + total_miles
     stops_for_order = db.query(Stop).filter(Stop.order_id == order.id).order_by(Stop.sequence).all()
+    enrich_stops_with_coordinates(stops_for_order)
+    db.flush()
     order.route_geometry = stops_to_linestring(stops_for_order)
     order.total_miles = compute_total_miles(stops_for_order)
     db.add(order)
@@ -291,6 +293,8 @@ def update_order_stops(order_id: int, body: OrderStopsUpdate, db: Session = Depe
     db.flush()
 
     stops_for_order = db.query(Stop).filter(Stop.order_id == order_id).order_by(Stop.sequence).all()
+    enrich_stops_with_coordinates(stops_for_order)
+    db.flush()
     order.route_geometry = stops_to_linestring(stops_for_order)
     order.total_miles = compute_total_miles(stops_for_order)
     db.add(order)
