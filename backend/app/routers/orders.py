@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from app.database import get_db
@@ -11,6 +11,7 @@ from app.schemas import (
     OrderListItem,
     OrderStopsUpdate,
     StopResponse,
+    CustomerCard,
 )
 from app.services.geometry import stops_to_linestring, compute_total_miles
 
@@ -18,8 +19,11 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 
 
 def _order_to_response(order: Order) -> OrderResponse:
-    """Convert Order model to OrderResponse with stops and route_geometry."""
+    """Convert Order model to OrderResponse with stops, route_geometry, and optional customer."""
     stops = [StopResponse.model_validate(s) for s in sorted(order.stops, key=lambda s: s.sequence)]
+    customer = None
+    if getattr(order, "customer", None) and order.customer:
+        customer = CustomerCard.model_validate(order.customer)
     return OrderResponse(
         id=order.id,
         customer_id=order.customer_id,
@@ -29,8 +33,10 @@ def _order_to_response(order: Order) -> OrderResponse:
         notes=order.notes,
         status=order.status,
         route_geometry=order.route_geometry,
+        total_miles=order.total_miles,
         stops=stops,
         created_at=order.created_at,
+        customer=customer,
     )
 
 
@@ -155,8 +161,13 @@ def list_orders(
 
 @router.get("/{order_id}", response_model=OrderResponse)
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    """Get single order with stops and route_geometry. 404 if not found."""
-    order = db.query(Order).filter(Order.id == order_id).first()
+    """Get single order with stops, route_geometry, and customer. 404 if not found."""
+    order = (
+        db.query(Order)
+        .options(joinedload(Order.customer))
+        .filter(Order.id == order_id)
+        .first()
+    )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     return _order_to_response(order)
