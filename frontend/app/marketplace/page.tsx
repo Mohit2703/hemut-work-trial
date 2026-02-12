@@ -17,47 +17,6 @@ interface FilterState {
   shipper: string;
 }
 
-const sidebarGroups: Array<{ title: string; items: Array<{ label: string; active?: boolean }> }> = [
-  {
-    title: "Load Sourcing",
-    items: [
-      { label: "Freight Marketplace", active: true },
-      { label: "RFP Management" },
-    ],
-  },
-  {
-    title: "Asset",
-    items: [
-      { label: "Scheduling" },
-      { label: "Tracking" },
-      { label: "Fleet management" },
-    ],
-  },
-  {
-    title: "Brokerage",
-    items: [
-      { label: "Brokerage Tracking" },
-      { label: "Carrier Brokerage" },
-    ],
-  },
-  {
-    title: "CRM",
-    items: [{ label: "CRM" }],
-  },
-  {
-    title: "Voice Agents",
-    items: [{ label: "SOP Builder" }, { label: "Communication" }],
-  },
-  {
-    title: "Fleet Management",
-    items: [{ label: "Quoting" }, { label: "Load Board" }],
-  },
-  {
-    title: "",
-    items: [{ label: "Settings" }],
-  },
-];
-
 const initialFilters: FilterState = {
   availableDate: "",
   timeWindow: "",
@@ -260,48 +219,9 @@ export default function MarketplacePage() {
 
   return (
     <main className="app-frame">
-      <aside className="shell-sidebar">
-        <div className="sidebar-top">
-          <div className="brand">
-            <span className="brand-mark" aria-hidden />
-            Hemut
-          </div>
-        </div>
-
-        <div className="sidebar-scroll">
-          {sidebarGroups.map((group) => (
-            <div key={group.title || group.items[0]?.label}>
-              {group.title ? <p className="sidebar-group-title">{group.title}</p> : null}
-              {group.items.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  className={`sidebar-item ${item.active ? "active" : ""}`}
-                >
-                  <span className="sidebar-item-icon">[]</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-
-        <div className="sidebar-footer">
-          <button type="button" className="sidebar-foot-btn" aria-label="desktop">
-            D
-          </button>
-          <button type="button" className="sidebar-foot-btn" aria-label="sun">
-            S
-          </button>
-          <button type="button" className="sidebar-foot-btn" aria-label="moon">
-            M
-          </button>
-        </div>
-      </aside>
-
       <section className="app-main">
         <header className="main-top">
-          <div className="breadcrumb">Load Sourcing / Freight Marketplace</div>
+          <div className="top-brand">Hemut</div>
           <div className="top-actions">
             <div className="search-shell">
               <span>Search</span>

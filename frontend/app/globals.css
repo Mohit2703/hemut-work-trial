@@ -198,6 +198,14 @@ button {
   text-overflow: ellipsis;
 }
 
+.top-brand {
+  color: #2f353d;
+  font-size: calc(26px * var(--font-scale));
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
 .top-actions {
   display: flex;
   align-items: center;
@@ -475,7 +483,7 @@ button {
 
 .order-row {
   display: grid;
-  grid-template-columns: 28px minmax(130px, 1.1fr) minmax(170px, 0.95fr) minmax(170px, 0.95fr) minmax(280px, 1fr) 184px;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(170px, 0.95fr) 30px minmax(170px, 0.95fr) minmax(280px, 1fr) 184px;
   gap: 12px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
@@ -506,18 +514,12 @@ button {
   background: #f1d028;
 }
 
-.check-cell input {
-  width: 15px;
-  height: 15px;
-  accent-color: #c1c7d2;
-}
-
 .company-block {
   min-width: 0;
 }
 
 .company-title {
-  font-size: calc(24px * var(--font-scale));
+  font-size: calc(19px * var(--font-scale));
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -568,8 +570,14 @@ button {
   min-width: 0;
 }
 
+.route-truck {
+  text-align: center;
+  font-size: calc(15px * var(--font-scale));
+  line-height: 1;
+}
+
 .city-name {
-  font-size: calc(22px * var(--font-scale));
+  font-size: calc(17px * var(--font-scale));
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.06;
@@ -979,6 +987,16 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   font-weight: 700;
+}
+
+.field-hint {
+  margin: 4px 0 0;
+  color: #8f96a2;
+  font-size: calc(11px * var(--font-scale));
+}
+
+.field-hint.error {
+  color: #bf4d48;
 }
 
 .margin-mode {
@@ -1451,11 +1469,11 @@ button {
   }
 
   .city-name {
-    font-size: calc(20px * var(--font-scale));
+    font-size: calc(16px * var(--font-scale));
   }
 
   .company-title {
-    font-size: calc(22px * var(--font-scale));
+    font-size: calc(18px * var(--font-scale));
   }
 }
 
@@ -1469,7 +1487,7 @@ button {
   }
 
   .order-row {
-    grid-template-columns: 24px minmax(120px, 1fr) minmax(130px, 0.8fr) minmax(130px, 0.8fr) minmax(230px, 1fr) 164px;
+    grid-template-columns: minmax(120px, 1fr) minmax(130px, 0.8fr) 24px minmax(130px, 0.8fr) minmax(230px, 1fr) 164px;
   }
 
   .drawer-title,
@@ -1480,11 +1498,11 @@ button {
   }
 
   .company-title {
-    font-size: calc(20px * var(--font-scale));
+    font-size: calc(17px * var(--font-scale));
   }
 
   .city-name {
-    font-size: calc(18px * var(--font-scale));
+    font-size: calc(15px * var(--font-scale));
   }
 
   .order-list-head,
@@ -1552,13 +1570,17 @@ button {
 
 @media (max-width: 900px) {
   .order-row {
-    grid-template-columns: 20px minmax(120px, 1fr) minmax(120px, 1fr);
+    grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr);
+  }
+
+  .route-truck {
+    display: none;
   }
 
   .order-row .dest-cell,
   .order-row .meta-cell,
   .order-row .row-actions {
-    grid-column: 2 / span 2;
+    grid-column: 1 / span 2;
   }
 
   .order-row .dest-cell,
@@ -1630,11 +1652,11 @@ button {
   }
 
   .company-title {
-    font-size: calc(18px * var(--font-scale));
+    font-size: calc(16px * var(--font-scale));
   }
 
   .city-name {
-    font-size: calc(16px * var(--font-scale));
+    font-size: calc(14px * var(--font-scale));
   }
 
   .market-toolbar {

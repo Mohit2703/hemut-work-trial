@@ -58,3 +58,11 @@ class OrderListResponse(BaseModel):
 
 class OrderStopsUpdate(BaseModel):
     stops: list[StopUpdate]  # optional id for existing stops
+
+
+class OrderMilesEstimateRequest(BaseModel):
+    stops: list[StopCreate]
+
+
+class OrderMilesEstimateResponse(BaseModel):
+    total_miles: Optional[float] = None

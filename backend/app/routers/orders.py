@@ -10,6 +10,8 @@ from app.schemas import (
     OrderResponse,
     OrderListResponse,
     OrderListItem,
+    OrderMilesEstimateRequest,
+    OrderMilesEstimateResponse,
     OrderStopsUpdate,
     StopResponse,
     CustomerCard,
@@ -239,6 +241,39 @@ def list_orders(
         )
 
     return OrderListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.post("/estimate-miles", response_model=OrderMilesEstimateResponse)
+def estimate_order_miles(body: OrderMilesEstimateRequest):
+    """
+    Estimate route miles from stop locations using Nominatim + OSRM.
+    Returns null when fewer than two locations can be resolved.
+    """
+    if len(body.stops) < 2:
+        return OrderMilesEstimateResponse(total_miles=None)
+
+    transient_stops: list[Stop] = []
+    for stop in body.stops:
+        transient_stops.append(
+            Stop(
+                order_id=0,
+                sequence=stop.sequence,
+                stop_type=stop.stop_type,
+                location_name=stop.location_name,
+                address=stop.address,
+                city=stop.city,
+                state=stop.state,
+                zip=stop.zip,
+                lat=stop.lat,
+                lng=stop.lng,
+                scheduled_arrival_early=stop.scheduled_arrival_early,
+                scheduled_arrival_late=stop.scheduled_arrival_late,
+            )
+        )
+
+    enrich_stops_with_coordinates(transient_stops)
+    miles = compute_total_miles(transient_stops)
+    return OrderMilesEstimateResponse(total_miles=miles)
 
 
 @router.get("/{order_id}", response_model=OrderResponse)

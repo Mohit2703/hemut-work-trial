@@ -81,10 +81,6 @@ export default function OrderList({
                   }
                 }}
               >
-                <div className="check-cell">
-                  <input type="checkbox" onClick={(event) => event.stopPropagation()} />
-                </div>
-
                 <div className="company-block">
                   <div className="company-title">
                     {order.customer_name}
@@ -96,6 +92,10 @@ export default function OrderList({
                 <div className="city-cell">
                   <div className="city-name">{origin}</div>
                   <div className="city-time">{times.pickup}</div>
+                </div>
+
+                <div className="route-truck" aria-hidden>
+                  🚚
                 </div>
 
                 <div className="city-cell dest-cell">

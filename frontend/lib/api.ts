@@ -103,6 +103,10 @@ export interface OrderCreate {
   stops: StopCreate[];
 }
 
+export interface OrderMilesEstimateResponse {
+  total_miles?: number | null;
+}
+
 async function fetchApi<T>(
   path: string,
   options?: RequestInit
@@ -152,6 +156,13 @@ export function createOrder(body: OrderCreate): Promise<OrderResponse> {
   return fetchApi<OrderResponse>("/orders", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+export function estimateOrderMiles(stops: StopCreate[]): Promise<OrderMilesEstimateResponse> {
+  return fetchApi<OrderMilesEstimateResponse>("/orders/estimate-miles", {
+    method: "POST",
+    body: JSON.stringify({ stops }),
   });
 }
 

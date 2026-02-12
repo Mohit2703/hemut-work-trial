@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createOrder,
+  estimateOrderMiles,
   type CustomerListItem,
   type OrderCreate,
   type StopCreate,
@@ -183,7 +184,9 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
   ]);
 
   const [weightLbs, setWeightLbs] = useState<number | "">("");
-  const [miles, setMiles] = useState<number>(0);
+  const [miles, setMiles] = useState<number | null>(null);
+  const [milesLoading, setMilesLoading] = useState(false);
+  const [milesError, setMilesError] = useState<string | null>(null);
   const [rate, setRate] = useState<number>(0);
   const [commodity, setCommodity] = useState("General Freight");
 
@@ -200,6 +203,37 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
     () => Math.round(((stepIndex + 1) / stepDefs.length) * 100),
     [stepIndex]
   );
+
+  const stopPayloads = useMemo<StopCreate[]>(
+    () =>
+      stops.map((stop, index) => ({
+        stop_type: stop.stop_type,
+        location_name: stop.location_name || undefined,
+        address: stop.address || undefined,
+        city: stop.city || undefined,
+        state: stop.state || undefined,
+        zip: stop.zip || undefined,
+        scheduled_arrival_early: stop.scheduled_arrival_early || undefined,
+        scheduled_arrival_late: stop.scheduled_arrival_late || undefined,
+        sequence: index + 1,
+      })),
+    [stops]
+  );
+
+  const hasEnoughStopsForEstimate = stopPayloads.length >= 2;
+  const allStopsHaveCityState = stopPayloads.every(
+    (stop) => Boolean(stop.city?.trim()) && Boolean(stop.state?.trim())
+  );
+
+  const milesHint = useMemo(() => {
+    if (milesError) return milesError;
+    if (milesLoading) return "Calculating miles from route API...";
+    if (!hasEnoughStopsForEstimate || !allStopsHaveCityState) {
+      return "Add city and state for each stop to auto-calculate miles.";
+    }
+    if (miles == null) return "Could not estimate miles for these stops.";
+    return "Calculated from routing API (OSRM).";
+  }, [milesError, milesLoading, hasEnoughStopsForEstimate, allStopsHaveCityState, miles]);
 
   function updateStop(index: number, key: keyof StopRow, value: string | number) {
     setStops((current) =>
@@ -254,23 +288,49 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
     return null;
   }
 
+  useEffect(() => {
+    if (!hasEnoughStopsForEstimate || !allStopsHaveCityState) {
+      setMiles(null);
+      setMilesError(null);
+      setMilesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setMilesLoading(true);
+      setMilesError(null);
+
+      estimateOrderMiles(stopPayloads)
+        .then((response) => {
+          if (cancelled) return;
+          const estimatedMiles = response.total_miles ?? null;
+          setMiles(estimatedMiles);
+          if (estimatedMiles == null) {
+            setMilesError("Could not estimate miles for these stops.");
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setMiles(null);
+          setMilesError("Failed to estimate miles from route API.");
+        })
+        .finally(() => {
+          if (!cancelled) setMilesLoading(false);
+        });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [stopPayloads, hasEnoughStopsForEstimate, allStopsHaveCityState]);
+
   async function submitOrder() {
     if (!customer) {
       setError("Customer name is required.");
       return;
     }
-
-    const stopPayloads: StopCreate[] = stops.map((stop, index) => ({
-      stop_type: stop.stop_type,
-      location_name: stop.location_name || undefined,
-      address: stop.address || undefined,
-      city: stop.city || undefined,
-      state: stop.state || undefined,
-      zip: stop.zip || undefined,
-      scheduled_arrival_early: stop.scheduled_arrival_early || undefined,
-      scheduled_arrival_late: stop.scheduled_arrival_late || undefined,
-      sequence: index + 1,
-    }));
 
     const payload: OrderCreate = {
       customer_id: customer.id,
@@ -286,7 +346,7 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
           contactName ? `Contact: ${contactName}` : "",
           contactNumber ? `Phone: ${contactNumber}` : "",
           email ? `Email: ${email}` : "",
-          miles > 0 ? `Miles: ${miles}` : "",
+          miles != null ? `Miles: ${miles.toFixed(2)}` : "",
           rate > 0 ? `Rate: ${rate}` : "",
         ]
           .filter(Boolean)
@@ -665,13 +725,17 @@ export default function CreateOrderModal({ onClose, onSuccess }: CreateOrderModa
                   />
                 </div>
                 <div>
-                  <label className="field-label">Miles</label>
+                  <label className="field-label">Miles (Auto)</label>
                   <input
                     className="field-control"
-                    type="number"
-                    value={miles}
-                    onChange={(event) => setMiles(Number(event.target.value) || 0)}
+                    type="text"
+                    readOnly
+                    value={milesLoading ? "Calculating..." : miles != null ? miles.toFixed(2) : ""}
+                    placeholder="Complete city/state for all stops"
                   />
+                  <p className={`field-hint ${milesError ? "error" : ""}`}>
+                    {milesHint}
+                  </p>
                 </div>
                 <div>
                   <label className="field-label">Rate ($)</label>
