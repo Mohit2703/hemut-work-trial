@@ -3,8 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database import engine
+from app.routers import orders, customers
 
 app = FastAPI(title="Freight Marketplace API")
+
+app.include_router(orders.router)
+app.include_router(customers.router)
 
 app.add_middleware(
     CORSMiddleware,
