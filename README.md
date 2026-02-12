@@ -29,6 +29,14 @@ A freight marketplace application with FastAPI backend and Next.js frontend.
 - **Backend API:** http://localhost:8000
 - **Backend health:** http://localhost:8000/health
 
+## API Endpoints
+
+- `POST /orders` – Create order with stops (sets route_geometry, total_miles)
+- `GET /orders` – List orders (search: `?q=`, pagination: `?page=1&page_size=10`)
+- `GET /orders/{id}` – Single order with stops and route_geometry
+- `PUT /orders/{id}/stops` – Replace stops (recomputes route_geometry, total_miles)
+- `GET /customers?query=` – Search customers by name (ILIKE)
+
 ## Environment
 
 Copy `.env.example` to `.env` and adjust if needed:

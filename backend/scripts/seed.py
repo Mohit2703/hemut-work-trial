@@ -13,15 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import SessionLocal
 from app.models import Customer, Order, Stop
-
-
-def build_route_geometry(stops):
-    """Build GeoJSON LineString from stops ordered by sequence. Coordinates as [lng, lat]."""
-    sorted_stops = sorted(stops, key=lambda s: s.sequence)
-    coordinates = [[s.lng, s.lat] for s in sorted_stops if s.lng is not None and s.lat is not None]
-    if not coordinates:
-        return None
-    return {"type": "LineString", "coordinates": coordinates}
+from app.services.geometry import stops_to_linestring, compute_total_miles
 
 
 def seed():
@@ -148,9 +140,10 @@ def seed():
                 db.add(stop)
 
             db.flush()
-            # Reload stops for this order to build geometry
+            # Reload stops for this order to build geometry and total_miles
             stops_for_order = db.query(Stop).filter(Stop.order_id == order.id).order_by(Stop.sequence).all()
-            order.route_geometry = build_route_geometry(stops_for_order)
+            order.route_geometry = stops_to_linestring(stops_for_order)
+            order.total_miles = compute_total_miles(stops_for_order)
             db.add(order)
 
         db.commit()
